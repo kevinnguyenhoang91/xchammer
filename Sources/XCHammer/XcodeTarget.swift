@@ -58,6 +58,15 @@ let DirectoriesAsFileSuffixes: [String] = [
     "lproj",
 ]
 
+func isBundleLibrary(_ ruleType: String) -> {
+    // TODO: Remove deprecated rule
+    return ruleType == "objc_bundle_library" || ruleType == "apple_resource_bundle"
+}
+
+func isBundle(_ ruleType: String) -> {
+    return ruleType == "objc_bundle" || ruleType == "apple_bundle_import"
+}
+
 func includeTarget(_ xcodeTarget: XcodeTarget, pathPredicate: (String) -> Bool) -> Bool {
     guard let buildFilePath = xcodeTarget.buildFilePath else {
         return false
@@ -69,7 +78,7 @@ func includeTarget(_ xcodeTarget: XcodeTarget, pathPredicate: (String) -> Bool) 
         return true
     }
 
-    if xcodeTarget.type == "objc_bundle_library" {
+    if isBundleLibrary(xcodeTarget.type) {
         return true
     }
 
@@ -89,7 +98,7 @@ func includeTarget(_ xcodeTarget: XcodeTarget, pathPredicate: (String) -> Bool) 
 
 // Traversal predicates
 private let stopAfterNeedsRecursive: TraversalTransitionPredicate<XcodeTarget> = TraversalTransitionPredicate { $0.needsRecursiveExtraction ? .justOnceMore : .keepGoing }
-private let stopAtBundles: TraversalTransitionPredicate<XcodeTarget> = TraversalTransitionPredicate { $0.type == "objc_bundle_library" ? .stop : .keepGoing }
+private let stopAtBundles: TraversalTransitionPredicate<XcodeTarget> = TraversalTransitionPredicate { isBundleLibrary($0.type) ? .stop : .keepGoing }
 
 public class XcodeTarget: Hashable, Equatable {
     private let ruleEntry: RuleEntry
@@ -977,7 +986,7 @@ public class XcodeTarget: Hashable, Equatable {
         let bundleResources = ([self] + self.transitiveTargets(map:
                     self.targetMap,
                     predicate: stopAfterNeedsRecursive))
-            .filter { $0.type == "objc_bundle" }
+            .filter { isBundle($0.type) }
             .flatMap { $0.xcResources }
         return Set(bundleResources.map { self.resolveExternalPath(for: $0.path) }).map { ProjectSpec.TargetSource(path: $0) }
     }()
@@ -1070,7 +1079,8 @@ public class XcodeTarget: Hashable, Equatable {
             "macos_extension": ProductType.AppExtension,
             "objc_binary": ProductType.Application,
             "objc_library": ProductType.StaticLibrary,
-            "objc_bundle_library": ProductType.Bundle,
+            "objc_bundle_library": ProductType.Bundle, // TODO: Remove deprecated rule
+            "apple_resource_bundle": ProductType.Bundle,
             "objc_framework": ProductType.Framework,
             "swift_library": ProductType.StaticLibrary,
             "tvos_application": ProductType.Application,
